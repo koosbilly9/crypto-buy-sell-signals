@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Crypto Signals">
+<title>Crypto Signals</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#14171c;--muted:#6b7280;--line:#e5e7eb;--buy:#0a8f4e;--sell:#d12f3a;--hold:#b7791f;--accent:#2563eb;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--text:#e8eaee;--muted:#8b93a1;--line:#272c36;--buy:#34d27b;--sell:#ff6b73;--hold:#f0b44c;--accent:#6ea0ff;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top,0px) 12px env(safe-area-inset-bottom,0px)}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 0 8px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+button,select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+button.p{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.msg{color:var(--muted);font-size:13px;margin:6px 0}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
+th,td{padding:9px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;background:var(--card);color:var(--muted);font-weight:600;font-size:12px;cursor:pointer}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+.sym{color:var(--muted);font-size:12px;margin-left:4px}
+.sig{font-weight:700;text-align:center}
+.Buy{color:var(--buy)}.Sell{color:var(--sell)}.Hold,.Neutral{color:var(--hold)}.Avoid{color:var(--sell)}.Stable{color:var(--muted)}
+.up{color:var(--buy)}.dn{color:var(--sell)}
+footer{color:var(--muted);font-size:12px;padding:12px 0 20px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <h1>Crypto Signals</h1>
+  <div><select id="filter"><option value="all">All signals</option><option value="Buy">Buy</option><option value="Sell">Sell</option><option value="Hold">Hold</option></select>
+  <button class="p" id="go">Refresh</button></div>
+</header>
+<div class="bar"><i id="prog"></i></div>
+<div class="msg" id="msg">Loading…</div>
+<div class="wrap"><table>
+<thead><tr id="head"></tr></thead>
+<tbody id="body"></tbody>
+</table></div>
+<footer>
+Signal rules: RSI(14) below 30 = Buy (oversold), above 70 = Sell (overbought). Otherwise price above all three averages (30/90/120 day) = Hold (bullish), below all three = Avoid (bearish), mixed = Neutral. 5-year high and low use daily highs and lows. Data: CryptoCompare. This is a simple indicator view, not financial advice.
+</footer>
+<script>
+var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["lo","5y low"],["ma30","MA 30"],["ma90","MA 90"],["ma120","MA 120"],["rsi","RSI 14"],["signal","Signal"]];
+var rows=[],sortKey="rank",sortDir=1;
+var $=function(id){return document.getElementById(id)};
+var API="https://min-api.cryptocompare.com/data/";
+
+function fmt(n){
+  if(n==null||isNaN(n))return "–";
+  var a=Math.abs(n),d=a>=1000?0:a>=1?2:a>=0.01?4:6;
+  return "$"+n.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+}
+function sma(c,n){
+  if(c.length<n)return null;
+  var s=0;for(var i=c.length-n;i<c.length;i++)s+=c[i];
+  return s/n;
+}
+function rsi(c,n){
+  n=n||14;if(c.length<=n)return null;
+  var g=0,l=0,i,d;
+  for(i=1;i<=n;i++){d=c[i]-c[i-1];if(d>=0)g+=d;else l-=d}
+  g/=n;l/=n;
+  for(i=n+1;i<c.length;i++){d=c[i]-c[i-1];g=(g*(n-1)+(d>0?d:0))/n;l=(l*(n-1)+(d<0?-d:0))/n}
+  if(l===0)return 100;
+  return 100-100/(1+g/l);
+}
+function signal(r){
+  if(r.hi<1.5&&r.lo>0.5)return "Stable";
+  if(r.rsi==null)return "Neutral";
+  if(r.rsi<30)return "Buy";
+  if(r.rsi>70)return "Sell";
+  var up=0,t=0;
+  ["ma30","ma90","ma120"].forEach(function(k){if(r[k]!=null){t++;if(r.price>r[k])up++}});
+  if(t&&up===t)return "Hold";
+  if(t&&up===0)return "Avoid";
+  return "Neutral";
+}
+function getJSON(url){
+  return fetch(url).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()});
+}
+function loadCoin(c){
+  return getJSON(API+"v2/histoday?fsym="+encodeURIComponent(c.sym)+"&tsym=USD&limit=1825").then(function(j){
+    var d=(j.Data&&j.Data.Data||[]).filter(function(x){return x.close>0});
+    if(d.length<20)throw new Error("no history");
+    var closes=d.map(function(x){return x.close});
+    c.hi=Math.max.apply(null,d.map(function(x){return x.high}));
+    c.lo=Math.min.apply(null,d.map(function(x){return x.low>0?x.low:x.close}));
+    c.ma30=sma(closes,30);c.ma90=sma(closes,90);c.ma120=sma(closes,120);
+    c.rsi=rsi(closes,14);
+    c.signal=signal(c);
+  }).catch(function(){c.signal="n/a"});
+}
+function render(){
+  var f=$("filter").value;
+  var list=rows.filter(function(r){return f==="all"||r.signal===f});
+  list.sort(function(a,b){
+    var x=a[sortKey],y=b[sortKey];
+    if(x==null)return 1;if(y==null)return -1;
+    return (x>y?1:x<y?-1:0)*sortDir;
+  });
+  $("body").innerHTML=list.map(function(r){
+    var cls=r.signal;
+    return "<tr><td>"+r.rank+"</td><td>"+esc(r.name)+"<span class='sym'>"+esc(r.sym)+"</span></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td>"+fmt(r.lo)+"</td>"+
+    ["ma30","ma90","ma120"].map(function(k){return "<td class='"+(r[k]==null?"":r.price>r[k]?"up":"dn")+"'>"+fmt(r[k])+"</td>"}).join("")+
+    "<td>"+(r.rsi==null?"–":r.rsi.toFixed(1))+"</td><td class='sig "+cls+"'>"+(r.signal||"…")+"</td></tr>";
+  }).join("");
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
+
+function buildHead(){
+  $("head").innerHTML=COLS.map(function(c){return "<th data-k='"+c[0]+"'>"+c[1]+"</th>"}).join("");
+  $("head").onclick=function(e){
+    var k=e.target.getAttribute("data-k");if(!k)return;
+    if(sortKey===k)sortDir=-sortDir;else{sortKey=k;sortDir=(k==="rank"||k==="name"||k==="signal")?1:-1}
+    render();
+  };
+}
+function run(){
+  $("go").disabled=true;$("prog").style.width="0";rows=[];render();
+  $("msg").textContent="Loading top 50 by market cap…";
+  getJSON(API+"top/mktcapfull?limit=50&tsym=USD").then(function(j){
+    rows=j.Data.map(function(x,i){
+      var u=x.RAW&&x.RAW.USD||{};
+      return {rank:i+1,sym:x.CoinInfo.Name,name:x.CoinInfo.FullName,price:u.PRICE};
+    });
+    render();
+    var done=0,idx=0,total=rows.length;
+    function next(){
+      if(idx>=total)return Promise.resolve();
+      var c=rows[idx++];
+      return loadCoin(c).then(function(){
+        done++;$("prog").style.width=(done/total*100)+"%";
+        $("msg").textContent="Calculating indicators… "+done+"/"+total;
+        if(done%5===0||done===total)render();
+        return next();
+      });
+    }
+    return Promise.all([next(),next(),next(),next()]);
+  }).then(function(){
+    render();
+    $("msg").textContent="Updated "+new Date().toLocaleString()+". Tap a column header to sort.";
+  }).catch(function(e){
+    $("msg").textContent="Couldn’t load data ("+e.message+"). Check your connection and tap Refresh.";
+  }).then(function(){$("go").disabled=false});
+}
+buildHead();
+$("go").onclick=run;
+$("filter").onchange=render;
+run();
+</script>
+</body>
+</html>
