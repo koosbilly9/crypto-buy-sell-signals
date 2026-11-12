@@ -68,12 +68,25 @@ footer{padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px));line-height:1
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:860px){.tiles{grid-template-columns:repeat(2,1fr)}.page{padding:0 14px}nav.top .in{padding:10px 14px}.hero{padding-top:30px}}
 @media(prefers-reduced-motion:reduce){.hero{animation:none}*{transition:none!important}}
+.modal .box.wide{max-width:920px}
+.modal input,.modal select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0;width:100%}
+.pfform{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin:10px 0 6px;align-items:center}
+.pfform button{margin:0!important;white-space:nowrap}
+.pfsum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.pfsum .tile{padding:12px 14px;box-shadow:none}.pfsum .v{font-size:20px}
+.pfwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.modal table.pf{min-width:760px;margin:0}
+.modal .pf td,.modal .pf th{position:static;background:transparent;white-space:nowrap;text-align:right;font-size:13px;padding:9px 10px}
+.modal .pf td:first-child,.modal .pf th:first-child{text-align:left}
+.modal .pf td:last-child{text-align:right}
+.modal .pf button.lnk{margin:0 0 0 6px;font-size:12px}
+@media(max-width:620px){.pfform{grid-template-columns:1fr 1fr}.pfform select{grid-column:1/3}.pfsum{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <nav class="top"><div class="in">
   <div class="brand"><span class="mk"></span>Crypto Signals</div>
-  <div class="acts"><button id="aboutBtn">About</button><button class="p" id="go">Refresh</button></div>
+  <div class="acts"><button id="pfBtn">Portfolio</button><button id="aboutBtn">About</button><button class="p" id="go">Refresh</button></div>
 </div></nav>
 <main class="page">
 <section class="hero">
@@ -137,6 +150,21 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 <button class="p" id="aboutClose">Close</button>
 </div></div>
 
+<div id="pfm" class="modal" role="dialog" aria-modal="true" aria-label="My portfolio"><div class="box wide">
+<h2>My portfolio</h2>
+<p id="pfAsOf"></p>
+<div class="pfform">
+  <select id="pfCoin" aria-label="Coin"><option value="">Load market data first</option></select>
+  <input id="pfAmt" type="text" inputmode="decimal" placeholder="Amount owned" aria-label="Amount owned">
+  <input id="pfBuy" type="text" inputmode="decimal" placeholder="Buy price (USD)" aria-label="Buy price per coin in US dollars">
+  <button class="p" id="pfAdd">Add</button>
+</div>
+<p id="pfMsg"></p>
+<div class="pfsum" id="pfTot"></div>
+<div class="pfwrap"><table class="pf"><thead><tr><th>Coin</th><th>Amount</th><th>Buy price</th><th>Price now</th><th>Value</th><th>Profit/loss</th><th>Change</th><th>Price level</th><th></th></tr></thead><tbody id="pfBody"></tbody></table></div>
+<p style="margin-top:10px">Everything here is saved only in this browser, on this device. Profit and loss are estimates in US dollars based on the prices shown. They ignore fees, taxes and exchange rates, and are not tax or investment advice. Only coins in the current top 50 can be added.</p>
+<button id="pfClear">Delete all</button> <button class="p" id="pfClose">Close</button>
+</div></div>
 <div id="privacy" class="modal" role="dialog" aria-modal="true" aria-label="Privacy notice"><div class="box">
 <h2>Privacy notice</h2>
 <p>Last updated 12 November 2026. This notice explains how this page handles information, in line with South Africa&rsquo;s Protection of Personal Information Act (POPIA).</p>
@@ -144,6 +172,7 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 <p>This page has no accounts, sign-ups or forms, and we do not ask for or store your name, email address or other personal details.</p>
 <h3>What is stored on your device</h3>
 <p>To load faster and to respect data-provider limits, the page saves the latest market data in your browser&rsquo;s local storage. It stays on your device, contains no personal information and is not sent to us. You can clear it in your browser settings.</p>
+<p>If you use the Portfolio feature, the coins, amounts and buy prices you enter are saved in your browser&rsquo;s local storage on this device. They are never sent to us or to anyone else, and they will not appear on your other devices or browsers. You can remove them with Delete all in the Portfolio window or by clearing your browser data.</p>
 <h3>Third parties</h3>
 <p>When you open the page, your browser requests market data directly from CoinMarketCap and Binance, and the page itself is hosted on GitHub Pages. These providers can see technical information such as your IP address and browser type, and handle it under their own privacy policies. Links on the page open third-party sites that have their own policies.</p>
 <h3>Analytics</h3>
@@ -161,7 +190,7 @@ var REFRESH_HOURS=2,KEY="cs_cache_v3";
 var lastT=null;
 var rows=[],sortKey="rank",sortDir=1,bull=null;
 var $=function(id){return document.getElementById(id)};
-var PROXY="https://crypto-proxy.koosbilly9.workers.dev/listings";
+var PROXY="https://crypto-proxy.koosbilly9.workers.dev/listings"; // your Cloudflare Worker address, e.g. "https://crypto-proxy.yourname.workers.dev/listings"
 var CMC_LIST=PROXY||"https://pro-api.coinmarketcap.com/public-api/v1/cryptocurrency/listings/latest?start=1&limit=50&convert=USD&sort=market_cap&sort_dir=desc";
 var CF_TOKEN=""; // Cloudflare Web Analytics token (leave empty to disable analytics)
 var BIN="https://data-api.binance.vision/api/v3/klines?interval=1d&limit=1000&symbol=";
@@ -248,6 +277,57 @@ function nameHtml(r){
   return u?"<a class='nm' href='"+esc(u)+"' target='_blank' rel='noopener'>"+esc(r.name)+"</a>":"<span class='nm'>"+esc(r.name)+"</span>";
 }
 function cmcUrl(slug){return "https://coinmarketcap.com/currencies/"+encodeURIComponent(slug)+"/"}
+var PF_KEY="cs_portfolio_v1",pf=[],editIdx=-1;
+function pfLoad(){try{var j=JSON.parse(localStorage.getItem(PF_KEY));pf=Array.isArray(j)?j.filter(function(x){return x&&x.sym&&x.amt>0&&x.buy>=0}):[]}catch(e){pf=[]}}
+function pfSave(){try{localStorage.setItem(PF_KEY,JSON.stringify(pf))}catch(e){$("pfMsg").textContent="Couldn’t save in this browser. Storage may be blocked."}}
+function rowFor(sym){for(var i=0;i<rows.length;i++)if(rows[i].sym===sym)return rows[i];return null}
+function num(v){return parseFloat(String(v).trim().replace(",","."))}
+function levelPill(r){
+  if(r.state==="stable")return {sg:"Stable",cl:"Stable"};
+  if(r.state==="na")return {sg:"n/a",cl:"none"};
+  if(r.state!=="ok"||r.rsi==null)return {sg:"…",cl:"none"};
+  var l=level(r);
+  return l?{sg:l.n,cl:l.s>0?"buy":"sell"}:{sg:"Normal",cl:"none"};
+}
+function fillCoins(){
+  var sel=$("pfCoin"),v=sel.value;
+  sel.innerHTML=rows.length?rows.map(function(r){return "<option value='"+esc(r.sym)+"'>"+esc(r.sym)+" – "+esc(r.name)+"</option>"}).join(""):"<option value=''>Load market data first</option>";
+  if(v)sel.value=v;
+}
+function sgn(n){return (n>=0?"+":"−")+fmt(Math.abs(n))}
+function renderPortfolio(){
+  var tb=$("pfBody"),tc=0,tv=0,skipped=0;
+  if(!pf.length){
+    tb.innerHTML="<tr><td colspan='9' style='text-align:center;color:var(--muted)'>No holdings yet. Add your first coin above.</td></tr>";
+    $("pfTot").innerHTML="";return;
+  }
+  tb.innerHTML=pf.map(function(h,i){
+    var r=rowFor(h.sym),cost=h.amt*h.buy,price=r?r.price:null;
+    var val=price==null?null:h.amt*price,pl=val==null?null:val-cost,pct=(pl==null||cost<=0)?null:pl/cost*100;
+    if(val==null)skipped++;else{tc+=cost;tv+=val}
+    var p=r?levelPill(r):{sg:"–",cl:"none"},c=pl==null?"":pl>=0?"up":"dn";
+    return "<tr><td>"+esc(h.sym)+"</td><td>"+h.amt.toLocaleString(undefined,{maximumFractionDigits:8})+"</td><td>"+fmt(h.buy)+"</td><td>"+fmt(price)+"</td><td>"+fmt(val)+"</td><td class='"+c+"'>"+(pl==null?"–":sgn(pl))+"</td><td class='"+c+"'>"+(pct==null?"–":(pct>=0?"+":"−")+Math.abs(pct).toFixed(1)+"%")+"</td><td><span class='pill "+p.cl+"'>"+p.sg+"</span></td><td><button class='lnk' data-e='"+i+"'>Edit</button><button class='lnk' data-d='"+i+"'>Delete</button></td></tr>";
+  }).join("");
+  var tpl=tv-tc,tpct=tc>0?tpl/tc*100:null,cc=tpl>=0?"up":"dn";
+  $("pfTot").innerHTML="<div class='tile'><div class='k'>Invested</div><div class='v'>"+fmt(tc)+"</div></div>"+
+    "<div class='tile'><div class='k'>Current value</div><div class='v'>"+fmt(tv)+"</div></div>"+
+    "<div class='tile'><div class='k'>Profit/loss</div><div class='v "+cc+"'>"+sgn(tpl)+(tpct==null?"":" ("+(tpct>=0?"+":"−")+Math.abs(tpct).toFixed(1)+"%)")+"</div>"+(skipped?"<div class='n'>"+skipped+" holding(s) without a current price are left out.</div>":"")+"</div>";
+}
+function pfSync(){
+  if(!$("pfCoin"))return;
+  var n=$("pfCoin").options.length;
+  if((rows.length&&n!==rows.length)||(!rows.length&&n!==1))fillCoins();
+  $("pfAsOf").textContent=lastT?"Prices as of "+hhmm(lastT)+".":"";
+  renderPortfolio();
+}
+function pfAdd(){
+  var sym=$("pfCoin").value,amt=num($("pfAmt").value),buy=num($("pfBuy").value);
+  if(!sym||!(amt>0)||isNaN(buy)||buy<0){$("pfMsg").textContent="Pick a coin, then enter the amount you own and the price you paid per coin.";return}
+  var item={sym:sym,amt:amt,buy:buy};
+  if(editIdx>=0)pf[editIdx]=item;else pf.push(item);
+  editIdx=-1;$("pfAdd").textContent="Add";$("pfAmt").value="";$("pfBuy").value="";$("pfMsg").textContent="";
+  pfSave();renderPortfolio();
+}
 function hue(t){var h=0;for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%360;return h}
 function updateTiles(){
   var lo=0,hi=0,n=rows.length;
@@ -258,6 +338,7 @@ function updateTiles(){
   $("tRegN").textContent=bull===null?"Bitcoin vs its 200-day average":bull?"Bitcoin is above its 200-day average":"Bitcoin is below its 200-day average";
   $("tUpd").textContent=lastT?hhmm(lastT):"–";
   $("tUpdN").textContent=lastT?"Next refresh after "+hhmm(lastT+REFRESH_HOURS*3600000):"Loading…";
+  pfSync();
 }
 function f1(v){return v==null?"–":v.toFixed(1)}
 function render(){
@@ -358,11 +439,27 @@ function run(){
     else $("msg").textContent="Couldn’t load data ("+e.message+"). "+(PROXY?"Wait a minute and tap Refresh.":"The data source blocks direct browser requests, so the data proxy needs to be set up.");
   }).then(function(){$("go").disabled=false});
 }
+pfLoad();
 buildHead();
 $("go").onclick=click;
 $("aboutBtn").onclick=function(){$("about").style.display="block"};
 $("aboutClose").onclick=function(){$("about").style.display="none"};
 $("about").addEventListener("click",function(e){if(e.target.id==="about")$("about").style.display="none"});
+$("pfBtn").onclick=function(){pfSync();$("pfm").style.display="block"};
+$("pfClose").onclick=function(){$("pfm").style.display="none"};
+$("pfm").addEventListener("click",function(e){if(e.target.id==="pfm")$("pfm").style.display="none"});
+$("pfAdd").onclick=pfAdd;
+$("pfClear").onclick=function(){if(pf.length&&confirm("Delete all holdings from this browser?")){pf=[];editIdx=-1;$("pfAdd").textContent="Add";pfSave();renderPortfolio()}};
+$("pfBody").addEventListener("click",function(e){
+  var b=e.target.closest("button");if(!b)return;
+  var d=b.getAttribute("data-d"),ed=b.getAttribute("data-e");
+  if(d!==null){pf.splice(+d,1);editIdx=-1;$("pfAdd").textContent="Add";pfSave();renderPortfolio()}
+  else if(ed!==null){
+    var h=pf[+ed],sel=$("pfCoin");
+    if(![].some.call(sel.options,function(o){return o.value===h.sym})){var o=document.createElement("option");o.value=h.sym;o.textContent=h.sym;sel.appendChild(o)}
+    sel.value=h.sym;$("pfAmt").value=h.amt;$("pfBuy").value=h.buy;editIdx=+ed;$("pfAdd").textContent="Save";$("pfMsg").textContent="Editing "+h.sym+". Change the values and tap Save.";
+  }
+});
 $("privBtn").onclick=function(){$("privacy").style.display="block"};
 $("privClose").onclick=function(){$("privacy").style.display="none"};
 $("privacy").addEventListener("click",function(e){if(e.target.id==="privacy")$("privacy").style.display="none"});
@@ -373,7 +470,7 @@ if(CF_TOKEN){
   document.head.appendChild(sc);
   $("privAn").textContent="This page uses Cloudflare Web Analytics to count visits and pages viewed in aggregate. It does not use cookies or track you across other sites.";
 }
-document.addEventListener("keydown",function(e){if(e.key==="Escape"){$("about").style.display="none";$("privacy").style.display="none"}});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"){$("about").style.display="none";$("privacy").style.display="none";$("pfm").style.display="none"}});
 $("filter").onchange=render;
 (function(){var c=readCache();if(fresh(c))useCache(c,"Loaded from saved data.");else run()})();
 </script>
