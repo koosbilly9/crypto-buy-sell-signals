@@ -26,7 +26,7 @@ th{position:sticky;top:0;background:var(--card);color:var(--muted);font-weight:6
 th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
 .sym{color:var(--muted);font-size:12px;margin-left:6px;text-decoration:none}.sym:hover,.nm:hover{text-decoration:underline}.nm{color:var(--text);text-decoration:none;font-weight:600}
 .sig{font-weight:700;text-align:center}
-.buy{color:var(--buy)}.sell{color:var(--sell)}.none,.Stable{color:var(--muted)}.sig.buy,.sig.sell{font-weight:800}#tip{display:none;position:fixed;z-index:50;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;max-width:min(520px,92vw);box-shadow:0 8px 28px rgba(0,0,0,.35);text-align:left;white-space:normal}#tip h4{margin:8px 0 2px;font-size:13px}#tip h4:first-child{margin-top:0}#tip div{color:var(--muted)}.i{cursor:help;color:var(--accent);margin-left:3px}#reg{font-weight:600}
+.buy{color:var(--buy)}.sell{color:var(--sell)}.none,.Stable{color:var(--muted)}.sig.buy,.sig.sell{font-weight:800}#tip{display:none;position:fixed;z-index:50;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;max-width:min(520px,92vw);box-shadow:0 8px 28px rgba(0,0,0,.35);text-align:left;white-space:normal}#tip h4{margin:8px 0 2px;font-size:13px}#tip h4:first-child{margin-top:0}#tip div{color:var(--muted)}.i{cursor:help;color:var(--accent);margin-left:3px}#reg{font-weight:600}#about{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);overflow:auto}#about .box{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:14px;max-width:640px;margin:0 auto;padding:18px 20px;font-size:14px;line-height:1.55}#about h2{margin:0 0 8px;font-size:18px}#about h3{margin:14px 0 4px;font-size:14px}#about p{margin:0 0 8px;color:var(--muted)}#about .warn{color:var(--text);font-weight:600}#about button{margin-top:10px}
 .up{color:var(--buy)}.dn{color:var(--sell)}
 footer{color:var(--muted);font-size:12px;padding:12px 0 20px;line-height:1.5}
 </style>
@@ -35,12 +35,27 @@ footer{color:var(--muted);font-size:12px;padding:12px 0 20px;line-height:1.5}
 <header>
   <h1>Crypto Signals</h1>
   <div><select id="filter"><option value="all">All signals</option><option value="buy">Any buy</option><option value="sell">Any sell</option><option value="3">Incredible only</option><option value="2">Great only</option><option value="1">Good only</option></select>
-  <button class="p" id="go">Refresh</button></div>
+  <button id="aboutBtn">About</button> <button class="p" id="go">Refresh</button></div>
 </header>
 <div class="bar"><i id="prog"></i></div>
 <div class="msg" id="msg">Loading…</div>
 <div class="msg"><span id="reg"></span></div>
 <div id="tip"></div>
+<div id="about" role="dialog" aria-modal="true" aria-label="About and disclaimer"><div class="box">
+<h2>About and disclaimer</h2>
+<p class="warn">This is not financial advice. Use this tool entirely at your own risk.</p>
+<h3>What this is</h3>
+<p>Crypto Signals is an informational and educational tool. It shows prices, moving averages and technical indicators (RSI, Stochastic RSI and MFI) for the largest cryptocurrencies, and labels coins as Good, Great or Incredible Buy or Sell using fixed indicator thresholds.</p>
+<h3>Not advice</h3>
+<p>Nothing on this page is investment, financial, tax or legal advice, or a recommendation, offer or solicitation to buy, sell or hold any asset. The signals are mechanical outputs of a formula. They do not know your goals, finances or risk tolerance. Consider speaking to a licensed financial adviser before making decisions.</p>
+<h3>Risks</h3>
+<p>Cryptocurrencies are highly volatile and you can lose some or all of the money you put in. Technical indicators are based on past prices and do not predict the future. A coin can look oversold or overbought for a long time, and signals can be wrong.</p>
+<h3>Data accuracy</h3>
+<p>Prices and rankings come from CoinGecko and price history from Binance. Data may be delayed, incomplete or wrong, may differ from other sources, and is saved in your browser for a couple of hours. Coins not listed on Binance have no indicators. Website links are provided for convenience and may be outdated.</p>
+<h3>No liability</h3>
+<p>This page is provided as is, without warranties of any kind. To the fullest extent permitted by law, its creator accepts no responsibility for any loss or damage arising from its use or from reliance on its content. Do your own research. This page is not affiliated with or endorsed by CoinGecko, Binance or any listed project.</p>
+<button class="p" id="aboutClose">Close</button>
+</div></div>
 <div class="wrap"><table>
 <thead><tr id="head"></tr></thead>
 <tbody id="body"></tbody>
@@ -237,6 +252,10 @@ function run(){
 }
 buildHead();
 $("go").onclick=click;
+$("aboutBtn").onclick=function(){$("about").style.display="block"};
+$("aboutClose").onclick=function(){$("about").style.display="none"};
+$("about").addEventListener("click",function(e){if(e.target.id==="about")$("about").style.display="none"});
+document.addEventListener("keydown",function(e){if(e.key==="Escape")$("about").style.display="none"});
 $("filter").onchange=render;
 (function(){var c=readCache();if(fresh(c))useCache(c,"Loaded from saved data.");else run()})();
 </script>
