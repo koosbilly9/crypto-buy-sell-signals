@@ -161,7 +161,7 @@ var REFRESH_HOURS=2,KEY="cs_cache_v3";
 var lastT=null;
 var rows=[],sortKey="rank",sortDir=1,bull=null;
 var $=function(id){return document.getElementById(id)};
-var PROXY=""; // your Cloudflare Worker address, e.g. "https://crypto-proxy.yourname.workers.dev/listings"
+var PROXY="https://crypto-proxy.koosbilly9.workers.dev/listings";
 var CMC_LIST=PROXY||"https://pro-api.coinmarketcap.com/public-api/v1/cryptocurrency/listings/latest?start=1&limit=50&convert=USD&sort=market_cap&sort_dir=desc";
 var CF_TOKEN=""; // Cloudflare Web Analytics token (leave empty to disable analytics)
 var BIN="https://data-api.binance.vision/api/v3/klines?interval=1d&limit=1000&symbol=";
