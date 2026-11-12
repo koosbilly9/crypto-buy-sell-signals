@@ -44,14 +44,15 @@ footer{color:var(--muted);font-size:12px;padding:12px 0 20px;line-height:1.5}
 <tbody id="body"></tbody>
 </table></div>
 <footer>
-Signal rules: RSI(14) below 30 = Buy (oversold), above 70 = Sell (overbought). Otherwise price above all three averages (30/90/120 day) = Hold (bullish), below all three = Avoid (bearish), mixed = Neutral. 5-year high and low use daily highs and lows. Data: CryptoCompare. This is a simple indicator view, not financial advice.
+Signal rules: RSI(14) below 30 = Buy (oversold), above 70 = Sell (overbought). Otherwise price above all three averages (30, 90 and 120 day) = Hold (bullish), below all three = Avoid (bearish), mixed = Neutral. 5-year high and low use daily highs and lows. Prices and ranks: CoinGecko. History: Binance (coins not listed there show n/a). This is a simple indicator view, not financial advice.
 </footer>
 <script>
 var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["lo","5y low"],["ma30","MA 30"],["ma90","MA 90"],["ma120","MA 120"],["rsi","RSI 14"],["signal","Signal"]];
 var rows=[],sortKey="rank",sortDir=1;
 var $=function(id){return document.getElementById(id)};
-var API="https://min-api.cryptocompare.com/data/";
-
+var CG="https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false";
+var BIN="https://data-api.binance.vision/api/v3/klines?interval=1d&limit=1000&symbol=";
+var STABLES=["USDT","USDC","DAI","USDE","USDS","FDUSD","PYUSD","TUSD","USDD","USD1","BUIDL","USDY","USDG","USDTB","FRAX","BSC-USD"];
 function fmt(n){
   if(n==null||isNaN(n))return "–";
   var a=Math.abs(n),d=a>=1000?0:a>=1?2:a>=0.01?4:6;
@@ -85,13 +86,17 @@ function signal(r){
 function getJSON(url){
   return fetch(url).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()});
 }
+function klines(sym,end){return getJSON(BIN+encodeURIComponent(sym)+"USDT"+(end?"&endTime="+end:""))}
 function loadCoin(c){
-  return getJSON(API+"v2/histoday?fsym="+encodeURIComponent(c.sym)+"&tsym=USD&limit=1825").then(function(j){
-    var d=(j.Data&&j.Data.Data||[]).filter(function(x){return x.close>0});
+  if(STABLES.indexOf(c.sym)>=0){c.signal="Stable";return Promise.resolve()}
+  return klines(c.sym).then(function(a){
+    if(a.length>=1000)return klines(c.sym,a[0][0]-1).then(function(b){return b.concat(a)});
+    return a;
+  }).then(function(d){
     if(d.length<20)throw new Error("no history");
-    var closes=d.map(function(x){return x.close});
-    c.hi=Math.max.apply(null,d.map(function(x){return x.high}));
-    c.lo=Math.min.apply(null,d.map(function(x){return x.low>0?x.low:x.close}));
+    var closes=d.map(function(x){return +x[4]});
+    c.hi=Math.max.apply(null,d.map(function(x){return +x[2]}));
+    c.lo=Math.min.apply(null,d.map(function(x){return +x[3]}));
     c.ma30=sma(closes,30);c.ma90=sma(closes,90);c.ma120=sma(closes,120);
     c.rsi=rsi(closes,14);
     c.signal=signal(c);
@@ -125,10 +130,9 @@ function buildHead(){
 function run(){
   $("go").disabled=true;$("prog").style.width="0";rows=[];render();
   $("msg").textContent="Loading top 50 by market cap…";
-  getJSON(API+"top/mktcapfull?limit=50&tsym=USD").then(function(j){
-    rows=j.Data.map(function(x,i){
-      var u=x.RAW&&x.RAW.USD||{};
-      return {rank:i+1,sym:x.CoinInfo.Name,name:x.CoinInfo.FullName,price:u.PRICE};
+  getJSON(CG).then(function(j){
+    rows=j.map(function(x,i){
+      return {rank:x.market_cap_rank||i+1,sym:String(x.symbol).toUpperCase(),name:x.name,price:x.current_price};
     });
     render();
     var done=0,idx=0,total=rows.length;
@@ -142,7 +146,7 @@ function run(){
         return next();
       });
     }
-    return Promise.all([next(),next(),next(),next()]);
+    return Promise.all([next(),next(),next()]);
   }).then(function(){
     render();
     $("msg").textContent="Updated "+new Date().toLocaleString()+". Tap a column header to sort.";
