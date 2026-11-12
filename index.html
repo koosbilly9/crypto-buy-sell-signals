@@ -24,7 +24,7 @@ table{border-collapse:collapse;width:100%;min-width:1150px;font-size:14px}
 th,td{padding:9px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
 th{position:sticky;top:0;background:var(--card);color:var(--muted);font-weight:600;font-size:12px;cursor:pointer}
 th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
-.sym{color:var(--muted);font-size:12px;margin-left:4px}
+.sym{color:var(--muted);font-size:12px;margin-left:6px;text-decoration:none}.sym:hover,.nm:hover{text-decoration:underline}.nm{color:var(--text);text-decoration:none;font-weight:600}
 .sig{font-weight:700;text-align:center}
 .buy{color:var(--buy)}.sell{color:var(--sell)}.none,.Stable{color:var(--muted)}.sig.buy,.sig.sell{font-weight:800}#tip{display:none;position:fixed;z-index:50;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;max-width:min(520px,92vw);box-shadow:0 8px 28px rgba(0,0,0,.35);text-align:left;white-space:normal}#tip h4{margin:8px 0 2px;font-size:13px}#tip h4:first-child{margin-top:0}#tip div{color:var(--muted)}.i{cursor:help;color:var(--accent);margin-left:3px}#reg{font-weight:600}
 .up{color:var(--buy)}.dn{color:var(--sell)}
@@ -48,8 +48,10 @@ footer{color:var(--muted);font-size:12px;padding:12px 0 20px;line-height:1.5}
 <footer>
 RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles, and a signal needs all three to qualify. Good Buy only appears in a bull market and Good Sell only in a bear market. The market regime is bull when Bitcoin trades above its 200-day average, otherwise bear. Prices and ranks: CoinGecko. History: Binance (coins not listed there show n/a). A simple indicator view, not financial advice.
 </footer>
+<script src="coins.js"></script>
 <script>
 var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["lo","5y low"],["ma30","MA 30"],["ma90","MA 90"],["ma120","MA 120"],["rsi","RSI"],["srsi","Stoch RSI"],["mfi","MFI"],["score","Signal"]];
+var REFRESH_HOURS=2,KEY="cs_cache_v2";
 var rows=[],sortKey="rank",sortDir=1,bull=null;
 var $=function(id){return document.getElementById(id)};
 var CG="https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false";
@@ -133,6 +135,11 @@ function loadCoin(c){
 function showReg(){
   $("reg").textContent=bull===null?"":"Market regime: "+(bull?"Bull (Bitcoin above its 200-day average), so Good Buy signals are active":"Bear (Bitcoin below its 200-day average), so Good Sell signals are active");
 }
+function nameHtml(r){
+  var u=(typeof COIN_LINKS!=="undefined")&&COIN_LINKS[r.sym];
+  return u?"<a class='nm' href='"+esc(u)+"' target='_blank' rel='noopener'>"+esc(r.name)+"</a>":"<span class='nm'>"+esc(r.name)+"</span>";
+}
+function cgUrl(id){return "https://www.coingecko.com/en/coins/"+encodeURIComponent(id)}
 function f1(v){return v==null?"–":v.toFixed(1)}
 function render(){
   var f=$("filter").value;
@@ -156,7 +163,7 @@ function render(){
     else if(r.lvl){sg=r.lvl.n;cl=r.lvl.s>0?"buy":"sell"}
     else{sg="–";cl="none"}
     var full=r.state==="ok";
-    return "<tr><td>"+r.rank+"</td><td>"+esc(r.name)+"<span class='sym'>"+esc(r.sym)+"</span></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td>"+fmt(r.lo)+"</td>"+
+    return "<tr><td>"+r.rank+"</td><td>"+nameHtml(r)+"<a class='sym' href='"+cgUrl(r.id)+"' target='_blank' rel='noopener'>"+esc(r.sym)+"</a></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td>"+fmt(r.lo)+"</td>"+
     ["ma30","ma90","ma120"].map(function(k){return "<td class='"+(r[k]==null?"":r.price>r[k]?"up":"dn")+"'>"+fmt(r[k])+"</td>"}).join("")+
     "<td>"+(full?f1(r.rsi):"–")+"</td><td>"+(full?f1(r.srsi):"–")+"</td><td>"+(full?f1(r.mfi):"–")+"</td><td class='sig "+cl+"'>"+sg+"</td></tr>";
   }).join("");
@@ -186,12 +193,26 @@ function showTip(){
 function hideTip(){$("tip").style.display="none"}
 function toggleTip(){$("tip").style.display==="block"?hideTip():showTip()}
 document.addEventListener("click",function(e){if(e.target.id!=="ii")hideTip()});
+function readCache(){try{var j=JSON.parse(localStorage.getItem(KEY));return j&&j.rows&&j.rows.length&&j.t?j:null}catch(e){return null}}
+function saveCache(){try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),bull:bull,rows:rows}))}catch(e){}}
+function hhmm(t){return new Date(t).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+function fresh(c){return c&&Date.now()<c.t+REFRESH_HOURS*3600000}
+function useCache(c,note){
+  rows=c.rows;bull=c.bull;showReg();render();$("prog").style.width="100%";
+  $("msg").textContent=note+" Saved data from "+new Date(c.t).toLocaleString()+". Next refresh available after "+hhmm(c.t+REFRESH_HOURS*3600000)+".";
+}
+function click(){
+  var c=readCache();
+  if(fresh(c)){useCache(c,"Data is up to date.");return}
+  run();
+}
 function run(){
+  var old=readCache();
   $("go").disabled=true;$("prog").style.width="0";rows=[];bull=null;showReg();render();
   $("msg").textContent="Loading top 50 by market cap…";
   getJSON(CG).then(function(j){
     rows=j.map(function(x,i){
-      return {rank:x.market_cap_rank||i+1,sym:String(x.symbol).toUpperCase(),name:x.name,price:x.current_price};
+      return {id:x.id,rank:x.market_cap_rank||i+1,sym:String(x.symbol).toUpperCase(),name:x.name,price:x.current_price};
     });
     render();
     var done=0,idx=0,total=rows.length;
@@ -207,16 +228,17 @@ function run(){
     }
     return Promise.all([next(),next(),next()]);
   }).then(function(){
-    render();
-    $("msg").textContent="Updated "+new Date().toLocaleString()+". Tap a column header to sort, hover (or tap ⓘ) on Signal for the rules.";
+    render();saveCache();
+    $("msg").textContent="Updated "+new Date().toLocaleString()+". Next refresh available after "+hhmm(Date.now()+REFRESH_HOURS*3600000)+". Hover (or tap ⓘ) on Signal for the rules.";
   }).catch(function(e){
-    $("msg").textContent="Couldn’t load data ("+e.message+"). Check your connection and tap Refresh.";
+    if(old)useCache(old,"Couldn’t refresh ("+e.message+").");
+    else $("msg").textContent="Couldn’t load data ("+e.message+"). Wait a minute and tap Refresh.";
   }).then(function(){$("go").disabled=false});
 }
 buildHead();
-$("go").onclick=run;
+$("go").onclick=click;
 $("filter").onchange=render;
-run();
+(function(){var c=readCache();if(fresh(c))useCache(c,"Loaded from saved data.");else run()})();
 </script>
 </body>
 </html>
