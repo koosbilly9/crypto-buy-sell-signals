@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Crypto Signals">
 <title>Crypto Signals</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%231f5eff%27/%3E%3Crect x=%279%27 y=%2716%27 width=%274%27 height=%279%27 rx=%272%27 fill=%27white%27/%3E%3Crect x=%2719%27 y=%2710%27 width=%274%27 height=%2715%27 rx=%272%27 fill=%27white%27/%3E%3C/svg%3E">
 <style>
 :root{--bg:#f6f8fc;--card:#fff;--text:#0b1220;--muted:#5b6579;--line:#e4e9f2;--accent:#1f5eff;--accent-soft:#eaf0ff;--buy:#0b8a4a;--buy-bg:#e3f6ec;--sell:#c8283a;--sell-bg:#fdeaec;--hold:#8a6d1c;--shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.06);color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0a0f1a;--card:#121929;--text:#eaf0fb;--muted:#93a0b8;--line:#1f2a3f;--accent:#6c9bff;--accent-soft:#16233f;--buy:#4be08f;--buy-bg:#0f2a1e;--sell:#ff7d89;--sell-bg:#33151a;--hold:#f0b44c;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}}
@@ -160,9 +161,8 @@ var REFRESH_HOURS=2,KEY="cs_cache_v3";
 var lastT=null;
 var rows=[],sortKey="rank",sortDir=1,bull=null;
 var $=function(id){return document.getElementById(id)};
-var CMC_BASE="https://pro-api.coinmarketcap.com/public-api";
-// Keyless (evaluation) route. For a production/commercial setup, point CMC_BASE at your own proxy that adds your CoinMarketCap API key.
-var CMC_LIST=CMC_BASE+"/v1/cryptocurrency/listings/latest?start=1&limit=50&convert=USD&sort=market_cap&sort_dir=desc";
+var PROXY=""; // your Cloudflare Worker address, e.g. "https://crypto-proxy.yourname.workers.dev/listings"
+var CMC_LIST=PROXY||"https://pro-api.coinmarketcap.com/public-api/v1/cryptocurrency/listings/latest?start=1&limit=50&convert=USD&sort=market_cap&sort_dir=desc";
 var CF_TOKEN=""; // Cloudflare Web Analytics token (leave empty to disable analytics)
 var BIN="https://data-api.binance.vision/api/v3/klines?interval=1d&limit=1000&symbol=";
 var STABLES=["USDT","USDC","DAI","USDE","USDS","FDUSD","PYUSD","TUSD","USDD","USD1","BUIDL","USDY","USDG","USDTB","FRAX","BSC-USD"];
@@ -355,7 +355,7 @@ function run(){
     $("msg").textContent="Updated "+new Date().toLocaleString()+". Next refresh available after "+hhmm(Date.now()+REFRESH_HOURS*3600000)+". Hover (or tap ⓘ) on Price level for the rules.";
   }).catch(function(e){
     if(old)useCache(old,"Couldn’t refresh ("+e.message+").");
-    else $("msg").textContent="Couldn’t load data ("+e.message+"). Wait a minute and tap Refresh.";
+    else $("msg").textContent="Couldn’t load data ("+e.message+"). "+(PROXY?"Wait a minute and tap Refresh.":"The data source blocks direct browser requests, so the data proxy needs to be set up.");
   }).then(function(){$("go").disabled=false});
 }
 buildHead();
